@@ -1,0 +1,90 @@
+services:
+  auth-service:
+    container_name: auth-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: always
+    env_file:
+      - .env
+    environment:
+      AUTH_POSTGRES_EXTERNAL_PORT: ${AUTH_POSTGRES_EXTERNAL_PORT:-5433}
+      AUTH_POSTGRES_INTERNAL_PORT: ${AUTH_POSTGRES_INTERNAL_PORT:-5432}
+      AUTH_SERVICE_EXTERNAL_PORT: ${AUTH_SERVICE_EXTERNAL_PORT:-8080}
+      AUTH_SERVICE_INTERNAL_PORT: ${AUTH_SERVICE_INTERNAL_PORT:-8080}
+      AUTH_REDIS_EXTERNAL_PORT: ${AUTH_REDIS_EXTERNAL_PORT:-6379}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      PRIVATE_KEY_PATH: ${PRIVATE_KEY_PATH}
+      PUBLIC_KEY_PATH: ${PUBLIC_KEY_PATH}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      auth-redis:
+        condition: service_started
+    ports:
+      - "${AUTH_SERVICE_EXTERNAL_PORT:-8080}:${AUTH_SERVICE_INTERNAL_PORT:-8080}"
+    expose:
+      - "${AUTH_SERVICE_INTERNAL_PORT:-8080}"
+    volumes:
+      - ./app:/workdir/app
+      - ./alembic:/workdir/alembic
+      - ./alembic.ini:/workdir/alembic.ini
+      - ./tests:/workdir/tests
+    networks:
+      - auth-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+  auth-db:
+    image: postgres:17.4-alpine
+    container_name: auth-db
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${AUTH_POSTGRES_DB}
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: --encoding=UTF-8
+      TZ: ${TZ}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_POSTGRES_USER} -d ${AUTH_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - auth_user_data:/var/lib/postgresql/data
+    ports:
+      - "${AUTH_POSTGRES_EXTERNAL_PORT:-5433}:${AUTH_POSTGRES_INTERNAL_PORT:-5432}"
+    expose:
+      - "${AUTH_POSTGRES_INTERNAL_PORT:-5432}"
+    networks:
+      - auth-network
+  auth-redis:
+    image: redis:7.4.2-alpine
+    container_name: auth-redis
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "${AUTH_REDIS_EXTERNAL_PORT}:6379"
+    volumes:
+      - auth_redis_data:/data
+    networks:
+      - auth-network
+    command: redis-server --appendonly yes --requirepass ${AUTH_REDIS_PASSWORD}
+networks:
+  auth-network:
+    name: auth-network
+    driver: bridge
+volumes:
+  auth_user_data:
+  auth_redis_data:

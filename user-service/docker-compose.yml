@@ -1,0 +1,60 @@
+services:
+  user-service:
+    container_name: user-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: always
+    env_file:
+      - .env
+    environment:
+      USER_SERVICE_EXTERNAL_PORT: ${USER_SERVICE_EXTERNAL_PORT}
+      USER_SERVICE_INTERNAL_PORT: ${USER_SERVICE_INTERNAL_PORT}
+      USER_POSTGRES_EXTERNAL_PORT: ${USER_POSTGRES_EXTERNAL_PORT}
+      USER_POSTGRES_INTERNAL_PORT: ${USER_POSTGRES_INTERNAL_PORT}
+    depends_on:
+      user-db:
+        condition: service_healthy
+    ports:
+      - "${USER_SERVICE_EXTERNAL_PORT}:${USER_SERVICE_INTERNAL_PORT}"
+    expose:
+      - "${USER_SERVICE_INTERNAL_PORT}"
+    volumes:
+      - ./app:/workdir/app
+      - ./alembic:/workdir/alembic
+      - ./alembic.ini:/workdir/alembic.ini
+      - ./tests:/workdir/tests
+    networks:
+      - user-network  
+  user-db:
+    image: postgres:17.4-alpine
+    container_name: user-db
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${USER_POSTGRES_DB}
+      POSTGRES_USER: ${USER_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${USER_POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: --encoding=UTF-8
+      TZ: ${TZ}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_POSTGRES_USER} -d ${USER_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - user_data:/var/lib/postgresql/data
+    ports:
+      - "${USER_POSTGRES_EXTERNAL_PORT:-5433}:${USER_POSTGRES_INTERNAL_PORT}"
+    expose:
+      - "${USER_POSTGRES_INTERNAL_PORT}"
+    networks:
+      - user-network
+networks:
+  user-network:
+    name: user-network
+    driver: bridge
+volumes:
+  user_data:
