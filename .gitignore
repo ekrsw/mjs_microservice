@@ -6,3 +6,6 @@ __pycache__/
 
 # 環境設定
 .env
+
+# MacOS関連
+.DS_Store
