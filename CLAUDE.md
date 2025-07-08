@@ -5,10 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 This is a Python microservices architecture project with two main services:
-- **auth-service**: Handles user authentication and JWT token management
-- **user-service**: Manages user data and operations
+- **auth-service**: Handles user authentication and JWT token management using RS256 algorithm
+- **user-service**: Manages user data and operations, receives user events from auth-service
 
-Both services are built with FastAPI and use PostgreSQL databases, Redis for caching, and RabbitMQ for inter-service communication.
+Both services are built with FastAPI and use PostgreSQL databases, Redis for caching (auth-service only), and RabbitMQ for inter-service communication.
 
 ## Development Commands
 
@@ -24,6 +24,9 @@ docker-compose up -d user-service
 # View logs
 docker-compose logs -f auth-service
 docker-compose logs -f user-service
+
+# Stop services
+docker-compose down
 ```
 
 ### Running Tests
@@ -32,12 +35,15 @@ docker-compose logs -f user-service
 cd auth-service
 python -m pytest tests/ -v
 
-# Run tests for user-service
+# Run tests for user-service  
 cd user-service
 python -m pytest tests/ -v
 
 # Run specific test file
 python -m pytest tests/unit/crud/test_crud_auth_user_normal.py -v
+
+# Run tests with coverage
+python -m pytest tests/ -v --cov=app --cov-report=html
 ```
 
 ### Database Operations
@@ -52,14 +58,20 @@ alembic revision --autogenerate -m "description"
 # Run database migrations for user-service
 cd user-service
 alembic upgrade head
+
+# View migration history
+alembic history
+
+# Downgrade to specific revision
+alembic downgrade -1
 ```
 
 ### Environment Setup
 Both services require a `.env` file with database credentials, Redis settings, and RabbitMQ configuration. Key environment variables include:
 - `AUTH_POSTGRES_*` and `USER_POSTGRES_*` for database connections
 - `RABBITMQ_*` for message broker settings
-- `AUTH_REDIS_*` for Redis configuration
-- JWT token settings for auth-service
+- `AUTH_REDIS_*` for Redis configuration (auth-service only)
+- JWT token settings: `ALGORITHM`, `PRIVATE_KEY_PATH`, `PUBLIC_KEY_PATH`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS`
 
 ## Architecture Overview
 
@@ -67,6 +79,8 @@ Both services require a `.env` file with database credentials, Redis settings, a
 - **RabbitMQ**: Message broker for asynchronous communication between services
 - **Topic Exchange**: Uses `user_events` and `auth_events` exchanges with routing keys
 - **Event-Driven**: Services communicate through events (user creation, authentication events)
+- **Routing Keys**: auth-service uses `user.sync`, user-service uses `user.created`
+- **Message Flow**: auth-service publishes user events → user-service consumes and processes → user-service publishes responses
 
 ### Data Layer
 - **SQLAlchemy 2.0**: ORM with async support
@@ -102,9 +116,11 @@ app/
 
 ### Testing
 - **pytest**: Test framework with async support
-- **In-memory SQLite**: For isolated database tests
-- **Fixtures**: Reusable test data and database sessions
+- **pytest-asyncio**: For async test support
+- **In-memory SQLite**: For isolated database tests using `sqlite+aiosqlite:///:memory:`
+- **Fixtures**: Reusable test data and database sessions in `conftest.py`
 - **Test Structure**: Unit tests organized by component (crud, security, etc.)
+- **Test Coverage**: `pytest-cov` for coverage reporting
 
 ## Important Notes
 
@@ -125,6 +141,13 @@ app/
 
 ### Docker Configuration
 - Multi-stage builds for production optimization
-- Health checks for all services
-- Resource limits and network isolation
-- Volume mounts for development
+- Health checks for all services (PostgreSQL, RabbitMQ)
+- Resource limits and network isolation (separate networks per service)
+- Volume mounts for development (hot-reload)
+- Service dependencies managed with `depends_on` and health checks
+
+### Network Architecture
+- **auth-network**: Isolated network for auth-service and its dependencies
+- **user-network**: Isolated network for user-service and its dependencies  
+- **microservice-network**: Shared network for RabbitMQ communication
+- Services communicate through RabbitMQ on the shared network

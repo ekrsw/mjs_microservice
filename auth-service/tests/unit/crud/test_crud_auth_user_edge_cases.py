@@ -130,19 +130,17 @@ async def test_unexpected_exception_handling(db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_session_rollback_on_exception(db_session):
+async def test_session_rollback_on_exception(db_engine):
     """例外発生時にセッションが適切にロールバックされることを確認する"""
     # テストの代替案：トランザクションのロールバックをシミュレートする
     
-    # 1. 新しいセッションを作成（テスト用）
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    # 1. テスト用のセッションファクトリを作成（SQLiteエンジンを使用）
+    from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import sessionmaker
-    from app.core.config import settings
     
-    # 新しいエンジンとセッションを作成
-    engine = create_async_engine(settings.DATABASE_URL)
+    # テスト用のエンジンを使用してセッションを作成
     TestingSessionLocal = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
+        db_engine, class_=AsyncSession, expire_on_commit=False
     )
     
     # 2. 最初のトランザクションでユーザーを作成
