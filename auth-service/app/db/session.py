@@ -19,7 +19,9 @@ async_engine = create_async_engine(
 AsyncSessionLocal = sessionmaker(
     async_engine,
     class_=AsyncSession,
-    autocommit=False
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False
 )
 
 # 非同期セッションジェネレータ
@@ -29,19 +31,11 @@ async def get_async_session() -> AsyncSession:
         try:
             logger.debug("Database session created successfully")
             yield session
+            logger.debug("Committing database session")
+            await session.commit()
+            logger.debug("Database session committed successfully")
         except Exception as e:
             # 例外発生時にロールバック
             logger.error(f"Exception occurred during database session, rolling back: {str(e)}")
             await session.rollback()
             raise # 例外を再スローして呼び出し元で処理できるようにする
-        finally:
-            try:
-                logger.debug("Committing database session")
-                await session.commit()
-                logger.debug("Database session committed successfully")
-            except Exception as e:
-                logger.error(f"Failed to commit database session: {str(e)}")
-                raise
-            finally:
-                logger.debug("Closing database session")
-                await session.close()

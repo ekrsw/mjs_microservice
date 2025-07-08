@@ -250,7 +250,7 @@ async def test_create_refresh_token():
         # 第3引数がJSON文字列であることを確認
         import json
         token_data = json.loads(redis_mock.setex.call_args[0][2])
-        assert token_data["user_id"] == user_id
+        assert token_data["auth_user_id"] == user_id
         assert "expires_at" in token_data
         
         # acloseが呼び出されたことを確認
@@ -270,7 +270,7 @@ async def test_verify_refresh_token():
     # トークンデータをJSON形式でエンコード
     import json
     token_data = {
-        "user_id": user_id,
+        "auth_user_id": user_id,
         "expires_at": future_timestamp
     }
     token_data_encoded = json.dumps(token_data).encode()

@@ -207,11 +207,28 @@ class CRUDAuthUser:
         self.logger.info(f"Updating user by id: {id}")
         db_obj = await self.get_by_id(session, id)
         update_fields = []
-        if obj_in.username:
+        
+        # usernameの検証と更新
+        if obj_in.username is not None:
+            if not obj_in.username or not obj_in.username.strip():
+                self.logger.error(f"Failed to update user: empty username")
+                raise ValueError("Username cannot be empty")
+            if len(obj_in.username) > 50:
+                self.logger.error(f"Failed to update user: username too long ({len(obj_in.username)} chars)")
+                raise ValueError("Username too long")
+            if len(obj_in.username) < 3:
+                self.logger.error(f"Failed to update user: username too short ({len(obj_in.username)} chars)")
+                raise ValueError("Username too short")
             self.logger.info(f"Updating username from '{db_obj.username}' to '{obj_in.username}'")
             db_obj.username = obj_in.username
             update_fields.append("username")
-        if obj_in.email:
+            
+        # emailの検証と更新
+        if obj_in.email is not None:
+            # Pydanticのemailvalidationは既に行われているので、空文字列チェックのみ
+            if not str(obj_in.email).strip():
+                self.logger.error(f"Failed to update user: empty email")
+                raise ValueError("Email cannot be empty")
             self.logger.info(f"Updating email from '{db_obj.email}' to '{obj_in.email}'")
             db_obj.email = obj_in.email
             update_fields.append("email")
@@ -238,11 +255,28 @@ class CRUDAuthUser:
         self.logger.info(f"Updating user by username: {username}")
         db_obj = await self.get_by_username(session, username)
         update_fields = []
-        if obj_in.username:
+        
+        # usernameの検証と更新
+        if obj_in.username is not None:
+            if not obj_in.username or not obj_in.username.strip():
+                self.logger.error(f"Failed to update user: empty username")
+                raise ValueError("Username cannot be empty")
+            if len(obj_in.username) > 50:
+                self.logger.error(f"Failed to update user: username too long ({len(obj_in.username)} chars)")
+                raise ValueError("Username too long")
+            if len(obj_in.username) < 3:
+                self.logger.error(f"Failed to update user: username too short ({len(obj_in.username)} chars)")
+                raise ValueError("Username too short")
             self.logger.info(f"Updating username from '{db_obj.username}' to '{obj_in.username}'")
             db_obj.username = obj_in.username
             update_fields.append("username")
-        if obj_in.email:
+            
+        # emailの検証と更新
+        if obj_in.email is not None:
+            # Pydanticのemailvalidationは既に行われているので、空文字列チェックのみ
+            if not str(obj_in.email).strip():
+                self.logger.error(f"Failed to update user: empty email")
+                raise ValueError("Email cannot be empty")
             self.logger.info(f"Updating email from '{db_obj.email}' to '{obj_in.email}'")
             db_obj.email = obj_in.email
             update_fields.append("email")
@@ -268,6 +302,18 @@ class CRUDAuthUser:
     async def update_password(self, session: AsyncSession, id: uuid.UUID, obj_in: AuthUserUpdatePassword) -> AuthUser:
         self.logger.info(f"Updating password for user with id: {id}")
         db_obj = await self.get_by_id(session, id)
+        
+        # 新しいパスワードの検証
+        if not obj_in.new_password or not obj_in.new_password.strip():
+            self.logger.error(f"Failed to update password for user {id}: empty new password")
+            raise ValueError("New password cannot be empty")
+        if len(obj_in.new_password) > 16:
+            self.logger.error(f"Failed to update password for user {id}: new password too long ({len(obj_in.new_password)} chars)")
+            raise ValueError("New password too long")
+        if len(obj_in.new_password) < 1:
+            self.logger.error(f"Failed to update password for user {id}: new password too short")
+            raise ValueError("New password too short")
+        
         # 現在のパスワードが正しいか検証
         if not verify_password(obj_in.current_password, db_obj.hashed_password):
             self.logger.error(f"Failed to update password for user {id}: current password is incorrect")

@@ -1,6 +1,6 @@
 from typing import Optional
 import uuid
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class AuthUserBase(BaseModel):
@@ -19,6 +19,8 @@ class AuthUserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     user_id: Optional[uuid.UUID] = None
     # passowrdは更新しない
+    
+    model_config = ConfigDict(validate_assignment=True)
 
 
 class AuthUserUpdatePassword(BaseModel):
